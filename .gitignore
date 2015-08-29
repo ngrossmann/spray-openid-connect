@@ -1,0 +1,4 @@
+connect-test/src/main/resources/application.conf
+target
+*/target
+.idea
