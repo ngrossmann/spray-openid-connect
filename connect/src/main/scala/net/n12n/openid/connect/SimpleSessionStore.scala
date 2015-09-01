@@ -4,6 +4,8 @@ import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
+import com.typesafe.config.Config
+
 import scala.concurrent.duration._
 import net.n12n.openid.connect.json.TokenExchange
 import spray.caching.{LruCache, Cache}
@@ -20,14 +22,13 @@ import scala.concurrent.{ExecutionContext, Future}
  * @param ec execution context.
  */
 class SimpleSessionStore(cache: Cache[OidUserContext], stateCache: Cache[Uri],
-  ec: ExecutionContext)
+                         cookieDomain: Option[String], ec: ExecutionContext)
   extends UserSessionStore[OidUserContext] {
   override implicit val executionContext = ec
   val cookieName = "net.n12.openid.connect.session"
   val sessionTimeout = 20 minutes
-  val cookieDomain = Config.config.getString(
-    "net.n12n.openid.connect.session.cookie-domain")
   val path = "/"
+
   override def fromRequest(ctx: RequestContext): Option[Future[OidUserContext]] = {
     ctx.request.cookies.find(_.name == cookieName).flatMap(
       cookie => cache.get(cookie.content))
@@ -41,7 +42,7 @@ class SimpleSessionStore(cache: Cache[OidUserContext], stateCache: Cache[Uri],
    * The access token may be used to request user profile information
    * from the identity provider.
    *
-   * @todo How to redirect to a new user sign-in page.
+   * @todo How to redirect to a new user sign-in page?
    *
    * @param ctx request context.
    * @param tokenExchange access token and id token.
@@ -58,9 +59,9 @@ class SimpleSessionStore(cache: Cache[OidUserContext], stateCache: Cache[Uri],
   }
 
   private def cookie(requestUri: Uri, value: String) = {
-    val domain = if (cookieDomain == "") requestUri.authority.host.address else cookieDomain
+    val secure = requestUri.scheme == "https"
     HttpCookie(cookieName, value,
-      None, None, Some(domain), Some(path), /* secure*/ false, /*httpOnly*/ false, None)
+      None, None, cookieDomain, Some(path), secure, /*httpOnly*/ false, None)
   }
 
   /**
@@ -81,20 +82,27 @@ class SimpleSessionStore(cache: Cache[OidUserContext], stateCache: Cache[Uri],
 }
 
 object SimpleSessionStore {
-  def apply(executionContext: ExecutionContext) = new SimpleSessionStore(
-    LruCache(
-      Config.config.getInt("net.n12n.openid.connect.session.max-cache-size"),
-      Config.config.getInt("net.n12n.openid.connect.session.initial-cache-size"),
-      Duration.Inf,
-      Config.config.getDuration("net.n12n.openid.connect.session.timeout",
-      TimeUnit.MILLISECONDS).millis
-    ),
-    LruCache(
-      Config.config.getInt("net.n12n.openid.connect.state-token.max-cache-size"),
-      Config.config.getInt("net.n12n.openid.connect.state-token.initial-cache-size"),
-      Duration.Inf,
-      Config.config.getDuration("net.n12n.openid.connect.state-token.timeout",
-        TimeUnit.MILLISECONDS).millis
-    ),
-    executionContext)
+  def apply(config: com.typesafe.config.Config)
+           (implicit executionContext: ExecutionContext) = {
+    val cookieDomain = config.getString(
+      "net.n12n.openid.connect.session.cookie-domain")
+
+    new SimpleSessionStore(
+      LruCache(
+        config.getInt("net.n12n.openid.connect.session.max-cache-size"),
+        config.getInt("net.n12n.openid.connect.session.initial-cache-size"),
+        Duration.Inf,
+        config.getDuration("net.n12n.openid.connect.session.timeout",
+          TimeUnit.MILLISECONDS).millis
+      ),
+      LruCache(
+        config.getInt("net.n12n.openid.connect.state-token.max-cache-size"),
+        config.getInt("net.n12n.openid.connect.state-token.initial-cache-size"),
+        Duration.Inf,
+        config.getDuration("net.n12n.openid.connect.state-token.timeout",
+          TimeUnit.MILLISECONDS).millis
+      ),
+      if (cookieDomain == "") None else Some(cookieDomain),
+      executionContext)
+  }
 }

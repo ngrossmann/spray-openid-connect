@@ -24,10 +24,8 @@ class OpenIdDirectivesSpec extends Suite with ScalatestRouteTest with FlatSpecLi
   keyStore.load(ClassLoader.getSystemResourceAsStream("test.jks"), keyPassword)
   val keyPair = createKeyPair()
 
-  class TestCallbackRoute(sessionStore: SimpleSessionStore,
-    discoveryDocument: DiscoveryDocument, system: ActorSystem) extends
-    CallbackRoute(sessionStore, discoveryDocument,
-      new StaticPubKeyStore(keyPair.getPublic))(system) {
+  class TestCallbackRoute(config: ConnectConfig[_], system: ActorSystem) extends
+    CallbackRoute(config, new StaticPubKeyStore(keyPair.getPublic))(system) {
 
     override protected def sendRequest(request: HttpRequest)(implicit system: ActorSystem): Future[TokenExchange] = {
       if (request.method == HttpMethods.POST) {
@@ -52,11 +50,12 @@ class OpenIdDirectivesSpec extends Suite with ScalatestRouteTest with FlatSpecLi
     Uri("https://www.googleapis.com/oauth2/v3/certs"))
   val cache = LruCache[OidUserContext](1, 1, Duration.Inf, 1 second)
   val stateCache = LruCache[Uri](1, 1, Duration.Inf, 1 second)
-  val userSessionStore = new SimpleSessionStore(cache, stateCache, system.dispatcher)
-
+  val config = ConnectConfig(system.settings.config,
+    new SimpleSessionStore(cache, stateCache, None, system.dispatcher),
+    discoveryDocument)
   val route = {
-    new TestCallbackRoute(userSessionStore, discoveryDocument, system) ~
-    OpenIdDirectives.authenticate(userSessionStore, discoveryDocument) { user =>
+    new TestCallbackRoute(config, system) ~
+    OpenIdDirectives.authenticate(config) { user =>
       path("protected") {
         get {
           complete(user.sub)

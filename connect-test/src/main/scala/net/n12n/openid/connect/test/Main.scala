@@ -20,9 +20,10 @@ object Main extends App with SimpleRoutingApp {
   val discoveryDocument = Await.result(DiscoveryDocument.fetch(
     Uri(system.settings.config.getString("discovery-uri"))), 5 seconds)
 
-  system.log.info(s"Discovery document: $discoveryDocument")
+  system.log.debug(s"Discovery document: $discoveryDocument")
 
-  val userSessionStore = SimpleSessionStore(system.dispatcher)
+  val config = ConnectConfig(system.settings.config,
+    SimpleSessionStore(system.settings.config), discoveryDocument)
 
   implicit val sslContext: SSLContext = {
     val context = SSLContext.getInstance("TLSv1.2")
@@ -43,8 +44,8 @@ object Main extends App with SimpleRoutingApp {
   }
 
   startServer(interface = "0.0.0.0", port = 8080) {
-    CallbackRoute.authenticationCallbackRoute(userSessionStore, discoveryDocument) ~
-    OpenIdDirectives.authenticate(userSessionStore, discoveryDocument) { user: OidUserContext =>
+    CallbackRoute.authenticationCallbackRoute(config) ~
+    OpenIdDirectives.authenticate(config) { user: OidUserContext =>
       path("protected") {
         get {
           complete(s"${user.sub}: ${user.email.getOrElse("")}")

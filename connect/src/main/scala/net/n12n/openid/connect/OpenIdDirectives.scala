@@ -8,20 +8,29 @@ import scala.util.{Failure, Success}
 
 trait OpenIdDirectives {
 
-  def authenticate[T](sessionStore: UserSessionStore[T],
-    discoveryDocument: DiscoveryDocument):
+  /**
+   * Ensure user is authenticated or redirect to authentication provider.
+   * Inner routes should have take a the user-context of type T as parameter.
+   *
+   * @param config connect configuration.
+   * @tparam T user-context object
+   * @return authentication directive.
+   */
+  def authenticate[T](config: ConnectConfig[T]):
     Directive1[T] = new Directive1[T] {
-    import sessionStore.executionContext
+    import config.sessionStore.executionContext
     override def happly(f: (::[T, HNil]) => Route): Route = {
       val authenticationRoute: Route = ctx => {
-        sessionStore.fromRequest(ctx) match {
+        config.sessionStore.fromRequest(ctx) match {
           case Some(future) => future.onComplete {
             case Success(userContext) => f(userContext :: HNil)(ctx)
             case Failure(e) => ctx.failWith(e)
           }
-          case None => ctx.redirect(authorizationUri(discoveryDocument,
-            sessionStore.stateToken(ctx.request.uri),
-            Config.redirectUri(ctx.request.uri)),
+          case None => ctx.redirect(authorizationUri(config.discoveryDocument,
+            config.sessionStore.stateToken(ctx.request.uri),
+            config.callback.resolvedAgainst(ctx.request.uri),
+            config.scope,
+            config.clientId),
             StatusCodes.Found)
         }
       }
@@ -38,10 +47,10 @@ trait OpenIdDirectives {
    * @return URI to redirect client to.
    */
   private def authorizationUri(discoveryDocument: DiscoveryDocument,
-    stateToken: String, redirectUri: Uri): Uri = {
+    stateToken: String, redirectUri: Uri, scope: String, clientId: String): Uri = {
     val builder = Uri.Query.newBuilder
-    builder += ("client_id" -> Config.clientId, "response_type" -> "code",
-      "scope" -> Config.scope, "redirect_uri" -> redirectUri.toString(),
+    builder += ("client_id" -> clientId, "response_type" -> "code",
+      "scope" -> scope, "redirect_uri" -> redirectUri.toString(),
       "state" -> stateToken)
     discoveryDocument.authorization_endpoint.withQuery(builder.result())
   }

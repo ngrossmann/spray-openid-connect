@@ -1,16 +1,13 @@
 package net.n12n.openid.connect
 
-import java.util.concurrent.TimeUnit
-
-import com.typesafe.config.ConfigFactory
 import spray.http.Uri
 
 /**
- * Utility class to read configuration.
+ * Client configuration container.
  */
-object Config {
-  private[connect] val config = ConfigFactory.load()
-  /** OAuth callback path. `net.n12n.openid.connect.callback-path`*/
+class ConnectConfig[T](config: com.typesafe.config.Config,
+                       val sessionStore: UserSessionStore[T],
+                       val discoveryDocument: DiscoveryDocument) {
   val callback = Uri(config.getString("net.n12n.openid.connect.callback-path"))
   /** Google client ID of application. `net.n12n.openid.connect.client-id`*/
   val clientId = config.getString("net.n12n.openid.connect.client-id")
@@ -21,12 +18,11 @@ object Config {
    * `net.n12n.openid.connect.scope`
    */
   val scope = config.getString("net.n12n.openid.connect.scope")
+}
 
-  /**
-   * Build callback URI based on request scheme and authority and
-   * [[net.n12n.openid.connect.Config.callback]]
-   * @param requestUri
-   * @return
-   */
-  def redirectUri(requestUri: Uri): Uri = callback.resolvedAgainst(requestUri)
+object ConnectConfig {
+  def apply[T](config: com.typesafe.config.Config,
+               sessionStore: UserSessionStore[T],
+               discoveryDocument: DiscoveryDocument) =
+  new ConnectConfig[T](config, sessionStore, discoveryDocument)
 }
