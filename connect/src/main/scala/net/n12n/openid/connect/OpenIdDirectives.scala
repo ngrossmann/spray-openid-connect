@@ -1,15 +1,9 @@
 package net.n12n.openid.connect
 
-import akka.actor.ActorSystem
-import net.n12n.openid.connect.json.{JsonWebToken, TokenExchange}
 import spray.http._
-import spray.client.pipelining._
-import spray.http._
-import spray.routing.AuthenticationFailedRejection.CredentialsRejected
 import spray.routing._
 import shapeless._
 
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 trait OpenIdDirectives {
@@ -27,7 +21,7 @@ trait OpenIdDirectives {
           }
           case None => ctx.redirect(authorizationUri(discoveryDocument,
             sessionStore.stateToken(ctx.request.uri),
-            Config.redirectUri.resolvedAgainst(ctx.request.uri)),
+            Config.redirectUri(ctx.request.uri)),
             StatusCodes.Found)
         }
       }
@@ -35,6 +29,14 @@ trait OpenIdDirectives {
     }
   }
 
+  /**
+   * Redirect to authorization provider.
+   * @param discoveryDocument discovery document with the providers
+   *                          authorization end-point.
+   * @param stateToken anti-forgery state token.
+   * @param redirectUri Open ID connect callback end-point.
+   * @return URI to redirect client to.
+   */
   private def authorizationUri(discoveryDocument: DiscoveryDocument,
     stateToken: String, redirectUri: Uri): Uri = {
     val builder = Uri.Query.newBuilder
@@ -43,9 +45,6 @@ trait OpenIdDirectives {
       "state" -> stateToken)
     discoveryDocument.authorization_endpoint.withQuery(builder.result())
   }
-
-  // TODO: Implement state token creation
-  protected def createStateToken(requestUri: Uri): String = requestUri.toString()
 }
 
 object OpenIdDirectives extends OpenIdDirectives

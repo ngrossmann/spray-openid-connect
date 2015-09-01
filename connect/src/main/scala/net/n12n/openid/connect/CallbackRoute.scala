@@ -19,14 +19,15 @@ class CallbackRoute(sessionStore: UserSessionStore[_],
   val log = LoggingContext.fromActorSystem(system)
 
   override def apply(ctx: RequestContext): Unit = {
-    if (ctx.request.uri.path == Config.redirectUri.path) {
+    if (ctx.request.uri.path == Config.callback.path) {
       val query = ctx.request.uri.query
       val params: Option[(String, String)] =
         query.get("state").zip(query.get("code")).headOption
       params match {
         case Some((state, code)) =>
           sessionStore.validateStateToken(state).flatMap(
-            uri => requestAccessToken(code, discoveryDocument).map((_, uri))).onComplete {
+            uri => requestAccessToken(code, discoveryDocument,
+            Config.redirectUri(ctx.request.uri)).map((_, uri))).onComplete {
             case Success((token, uri)) =>
               log.debug("Starting session for {}, redirecting to {}",
                 token.id.claims.email, uri)
@@ -42,16 +43,20 @@ class CallbackRoute(sessionStore: UserSessionStore[_],
       }
     } else {
       log.debug("Path {} did not match {}", ctx.request.uri.path,
-        Config.redirectUri.path)
+        Config.callback)
       ctx.reject()
     }
   }
 
-  private def requestAccessToken(code: String, discoveryDocument: DiscoveryDocument)(
-    implicit system: ActorSystem): Future[TokenExchange] = {
+  private def requestAccessToken(code: String,
+                                 discoveryDocument: DiscoveryDocument,
+                                  redirectUri: Uri)(
+                                implicit system: ActorSystem):
+  Future[TokenExchange] = {
     log.debug("Requesting access-token for {}", code)
     val params = FormData(Map("code" -> code, "client_id" -> Config.clientId,
-      "client_secret" -> Config.clientSecret, "redirect_uri" -> Config.redirectUri.toString(),
+      "client_secret" -> Config.clientSecret,
+      "redirect_uri" -> redirectUri.toString(),
       "grant_type" -> "authorization_code"))
     sendRequest(Post(discoveryDocument.token_endpoint, params)).flatMap {te =>
       pubKeyStore.validate(te.id).map(
