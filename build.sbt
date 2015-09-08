@@ -1,11 +1,16 @@
 lazy val commonSettings = Seq(
   organization := "net.n12n.openid",
+  developers := List(
+    Developer("ng", "Niklas Grossmann", "ngrossmann@gmx.net", url("https://github.com/ngrossmann"))),
   licenses := List(("Apache License Version 2.0", url("http://www.apache.org/licenses/"))),
+  homepage := Some(url("https://github.com/ngrossmann/spray-openid-connect")),
+  scmInfo := Some(ScmInfo(url("https://github.com/ngrossmann/spray-openid-connect"),
+    "https://github.com/ngrossmann/spray-openid-connect.git", None)),
+  startYear := Some(2015),
   version := "0.1.0-SNAPSHOT",
   scalaVersion  := "2.11.6",
   scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8", "-feature", "-language:postfixOps"),
   fork in Test := true,
-  resolvers ++= Seq("spray repo" at "http://repo.spray.io/"),
   libraryDependencies ++= {
     val akkaV = "2.3.9"
     val sprayV = "1.3.3"
@@ -24,12 +29,23 @@ lazy val commonSettings = Seq(
       "org.scalatest" %% "scalatest" % "2.2.4" % "test",
       "io.spray" %% "spray-testkit" % sprayV
     )
-  }
+  },
+  useGpg :=true
 )
 
 lazy val connect = (project in file("connect")).settings(commonSettings: _*).
   settings(
-    name := "openid-connect"
+    name := "openid-connect",
+    publishTo := {
+      val nexus = "https://oss.sonatype.org/"
+      if (isSnapshot.value)
+        Some("snapshots" at nexus + "content/repositories/snapshots")
+      else
+        Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+    },
+    publishMavenStyle := true,
+    publishArtifact in Test := false,
+    credentials += Credentials(Path.userHome / ".sbt" / "sonatype")
   )
 
 lazy val connectTest = (project in file("connect-test")).dependsOn(connect).
