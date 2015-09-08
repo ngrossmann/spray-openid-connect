@@ -13,6 +13,8 @@ class ConnectConfig[T](config: com.typesafe.config.Config,
   val clientId = config.getString("net.n12n.openid.connect.client-id")
   /** Google client secrete. `net.n12n.openid.connect.client-secret` */
   val clientSecret = config.getString("net.n12n.openid.connect.client-secret")
+  /** ID token issuer (iss claim) pattern. */
+  val issuer = config.getString("net.n12n.openid.connect.issuer").r
   /**
    * Scope parameter used in authentication request.
    * `net.n12n.openid.connect.scope`

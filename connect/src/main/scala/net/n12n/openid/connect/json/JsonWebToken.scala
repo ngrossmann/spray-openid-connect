@@ -23,6 +23,11 @@ case class JsonWebToken(val header: JwtHeader, val claims: Claims,
 }
 
 object JsonWebToken {
+  /**
+   * Read Json Web Token from base64 encoded string.
+   * @param token base64 encoded string.
+   * @return Json Web Token, not validated.
+   */
   def apply(token: String): JsonWebToken = {
     val decoder = Base64.getUrlDecoder
     val parts = token.split("\\.")

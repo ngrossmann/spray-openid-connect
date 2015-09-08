@@ -55,8 +55,11 @@ class CallbackRoute(config: ConnectConfig[_], pubKeyStore: PubKeyStore)
       "redirect_uri" -> redirectUri.toString(),
       "grant_type" -> "authorization_code"))
     sendRequest(Post(config.discoveryDocument.token_endpoint, params)).flatMap {te =>
-      pubKeyStore.validate(te.id).map(
-        if(_) te else throw new SecurityException("Token validation failed"))
+      pubKeyStore.validate(te.id, config.clientId, config.issuer).map{ _ match {
+        case Right(token) => te
+        case Left(reason) =>
+          throw new SecurityException(s"Token validation failed: $reason")
+      }}
     }
   }
 

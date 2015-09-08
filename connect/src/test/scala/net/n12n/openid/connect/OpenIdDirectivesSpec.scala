@@ -104,7 +104,8 @@ class OpenIdDirectivesSpec extends Suite with ScalatestRouteTest with FlatSpecLi
     val keyProtection = new KeyStore.PasswordProtection(keyPassword)
     val claims = Claims("https://accounts.google.com", None,
       Some(true), "sub", Some("azp"), Some("someone@email"),
-      "aud", 0L, 0L, Some("hd"))
+      "clientid.apps.googleusercontent.com", 0L,
+      System.currentTimeMillis / 1000 + 300, Some("hd"))
     val token = JsonWebToken(claims, keyPair.getPrivate, Some("mykey"))
     token
   }
